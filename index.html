@@ -55,9 +55,31 @@ textarea{width:100%;height:190px;background:var(--bg);color:var(--text);border:1
 .btn{background:var(--accent);color:#fff;padding:10px 20px;border-radius:10px;font-weight:600}
 .btn.sec{background:var(--dim);color:var(--text);margin-right:8px}
 @media (max-width:700px){.hint{display:none}}
+.login{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:50}
+.login form{width:min(320px,88vw);background:var(--panel);border:1px solid var(--dim);border-radius:16px;padding:22px}
+.login h1{font-size:1.1rem;margin:0 0 12px}
+.login label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+.login input[type=text],.login input[type=password]{width:100%;box-sizing:border-box;padding:9px 10px;border:1.5px solid var(--dim);border-radius:8px;background:var(--bg);color:var(--text);font-size:16px;font-family:inherit}
+.login .rem{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:13px;color:var(--text)}
+.login .btn{width:100%;margin-top:16px;border:0;cursor:pointer;font-size:15px}
+.login .err{color:#ff6b6b;font-size:13px;margin-top:10px;min-height:1em}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
+
+<div class="login" id="login" hidden><form id="loginForm">
+  <h1>Präsentations-Timer</h1>
+  <label for="u">Benutzer</label>
+  <input type="text" id="u" name="username" value="mike" autocomplete="username">
+  <label for="p">Passwort</label>
+  <input type="password" id="p" name="password" autocomplete="current-password" autofocus>
+  <label class="rem"><input type="checkbox" id="rem" checked> Auf diesem Gerät merken</label>
+  <button class="btn" type="submit">Anmelden</button>
+  <div class="err" id="err"></div>
+</form></div>
+
+<div id="app" hidden>
 
 <div class="stage" id="stage">
   <svg viewBox="-310 -310 620 620" id="svg" aria-hidden="true"></svg>
@@ -92,7 +114,9 @@ textarea{width:100%;height:190px;background:var(--bg);color:var(--text);border:1
   </div>
 </div>
 
-<script>
+</div>
+
+<script id="appjs" type="text/plain">
 const DEFAULT_PLAN = "Einstieg 2\nPraxisfall 1 4\nPraxisfall 2 4\nReflexion 3\nAbschluss 2";
 const COLORS = ["#ef5350","#ff9800","#fdd835","#66bb6a","#42a5f5","#ab47bc","#26c6da","#8d6e63"];
 const R = 215, GAP = 1.4; // Ringradius, Lücke zwischen Abschnitten in Grad
@@ -292,6 +316,25 @@ setTheme(store.get("theme", "dark"));
 setPlan(store.get("plan", DEFAULT_PLAN));
 (function loop(){ update(); requestAnimationFrame(loop); })();
 setInterval(() => { if (document.hidden) update(); }, 500); // läuft auch im Hintergrund-Tab weiter
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bcryptjs/2.4.3/bcrypt.min.js"></script>
+<script>
+// Login im Browser (gleicher Hash wie tasks), Merken pro Gerät. Der Hash wird beim Deploy eingesetzt.
+const USER = "mike", HASH = "__HASH__", KEY = "timerLogin";
+const $ = id => document.getElementById(id);
+const lsGet = () => { try { return localStorage.getItem(KEY); } catch (e) { return null; } };
+const lsSet = v => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch (e) {} };
+function enter() {
+  $("login").hidden = true; $("app").hidden = false;
+  const s = document.createElement("script"); s.textContent = $("appjs").textContent; document.body.appendChild(s);
+}
+if (lsGet() === HASH) enter(); else $("login").hidden = false;
+$("loginForm").addEventListener("submit", e => {
+  e.preventDefault(); $("err").textContent = "";
+  const bad = () => { $("err").textContent = "Benutzer oder Passwort falsch."; };
+  if ($("u").value.trim().toLowerCase() !== USER) return bad();
+  dcodeIO.bcrypt.compare($("p").value, HASH, (err, ok) => { if (!ok) return bad(); if ($("rem").checked) lsSet(HASH); enter(); });
+});
 </script>
 </body>
 </html>
