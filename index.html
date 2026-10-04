@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Präsentations-Timer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='38' fill='none' stroke='%23ef5350' stroke-width='14'/></svg>">
+<style>
+:root{
+  --bg:#0f1115; --panel:#181b22; --text:#f2f4f8; --muted:#8b93a5; --dim:#262b36; --accent:#ef5350;
+  --warn:#ffb300; --danger:#ff3d3d;
+}
+:root[data-theme="light"]{
+  --bg:#f6f7f9; --panel:#ffffff; --text:#1d2230; --muted:#6b7385; --dim:#e3e6ec; --accent:#e5484d;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;user-select:none}
+.stage{position:relative;width:min(96vw,calc(100vh - 70px));aspect-ratio:1;container-type:inline-size}
+svg{width:100%;height:100%;display:block;overflow:visible}
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
+.phase{font-size:5.4cqw;font-weight:600;letter-spacing:.02em;color:var(--muted);min-height:1.2em}
+.time{font-size:21cqw;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em;transition:color .4s}
+.time.warn{color:var(--warn)} .time.danger{color:var(--danger)}
+.time.over{color:var(--danger);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.45}}
+.sub{font-size:3.6cqw;color:var(--muted);margin-top:1.6cqw;font-variant-numeric:tabular-nums}
+.clock{font-size:4.6cqw;color:var(--muted);margin-top:1.2cqw;font-variant-numeric:tabular-nums;font-weight:500}
+.seg-base{fill:none;stroke:var(--dim);stroke-width:26;stroke-linecap:butt}
+.seg-live{fill:none;stroke-width:26;stroke-linecap:butt;transition:opacity .3s}
+.lbl{font-size:15px;fill:var(--muted);text-anchor:middle;transition:fill .3s}
+.lbl .n{font-weight:600}
+.lbl.active{fill:var(--text)}
+.lbl.done{opacity:.4}
+.dot{fill:#fff;stroke:var(--accent);stroke-width:5}
+.tick{stroke:var(--bg);stroke-width:3}
+.controls{position:fixed;right:22px;bottom:22px;display:flex;gap:12px;align-items:center}
+button{font:inherit;cursor:pointer;border:0;color:var(--text)}
+.go{width:72px;height:72px;border-radius:50%;background:var(--accent);box-shadow:0 6px 20px #0006;display:grid;place-items:center;transition:transform .15s}
+.go:hover{transform:scale(1.07)}
+.go svg{width:30px;height:30px;fill:#fff}
+.ico{width:46px;height:46px;border-radius:50%;background:var(--panel);color:var(--muted);font-size:18px;display:grid;place-items:center;border:1px solid var(--dim)}
+.ico:hover{color:var(--text)}
+.hint{position:fixed;left:22px;bottom:18px;color:var(--muted);font-size:13px;line-height:1.7;opacity:.8}
+kbd{background:var(--panel);border:1px solid var(--dim);border-radius:5px;padding:1px 7px;font:12px ui-monospace,Menlo,monospace;color:var(--text)}
+.edit{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:9}
+.edit.open{display:flex}
+.edit .box{background:var(--panel);border-radius:16px;padding:24px;width:min(440px,92vw);box-shadow:0 20px 60px #0008}
+.edit h2{margin:0 0 6px;font-size:18px}
+.edit p{margin:0 0 12px;color:var(--muted);font-size:13px}
+textarea{width:100%;height:190px;background:var(--bg);color:var(--text);border:1px solid var(--dim);border-radius:10px;padding:12px;font:15px/1.6 ui-monospace,Menlo,monospace;resize:none;user-select:text}
+.row{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+.row .sum{color:var(--muted);font-size:14px}
+.btn{background:var(--accent);color:#fff;padding:10px 20px;border-radius:10px;font-weight:600}
+.btn.sec{background:var(--dim);color:var(--text);margin-right:8px}
+@media (max-width:700px){.hint{display:none}}
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <svg viewBox="-310 -310 620 620" id="svg" aria-hidden="true"></svg>
+  <div class="center">
+    <div class="phase" id="phase"></div>
+    <div class="time" id="time">15:00</div>
+    <div class="sub" id="sub"></div>
+    <div class="clock" id="clock"></div>
+  </div>
+</div>
+
+<div class="hint">
+  <kbd>Leertaste</kbd> Start/Pause &nbsp; <kbd>R</kbd> Reset &nbsp; <kbd>←</kbd><kbd>→</kbd> Abschnitt<br>
+  <kbd>F</kbd> Vollbild &nbsp; <kbd>E</kbd> Ablauf ändern &nbsp; <kbd>M</kbd> Ton &nbsp; <kbd>T</kbd> Hell/Dunkel
+</div>
+
+<div class="controls">
+  <button class="ico" id="bEdit" title="Ablauf ändern (E)">✎</button>
+  <button class="ico" id="bReset" title="Reset (R)">↺</button>
+  <button class="go" id="bGo" title="Start / Pause (Leertaste)"><svg viewBox="0 0 24 24" id="goIcon"><path d="M8 5v14l11-7z"/></svg></button>
+</div>
+
+<div class="edit" id="edit">
+  <div class="box">
+    <h2>Ablauf</h2>
+    <p>Eine Zeile pro Abschnitt: Name und Minuten am Schluss.</p>
+    <textarea id="ta" spellcheck="false"></textarea>
+    <div class="row">
+      <span class="sum" id="sum"></span>
+      <span><button class="btn sec" id="bCancel">Abbrechen</button><button class="btn" id="bSave">Speichern</button></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_PLAN = "Einstieg 2\nPraxisfall 1 4\nPraxisfall 2 4\nReflexion 3\nAbschluss 2";
+const COLORS = ["#ef5350","#ff9800","#fdd835","#66bb6a","#42a5f5","#ab47bc","#26c6da","#8d6e63"];
+const R = 215, GAP = 1.4; // Ringradius, Lücke zwischen Abschnitten in Grad
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d){ try { return localStorage.getItem(k) ?? d } catch { return d } },
+  set(k, v){ try { localStorage.setItem(k, v) } catch {} }
+};
+
+let segs = [], total = 900;
+let acc = 0, t0 = 0, running = false, muted = store.get("muted","0") === "1";
+let lastPhase = -1, flags = {};
+let live = [], labels = [], dot, wakeLock = null;
+
+// ---------- Plan ----------
+function parsePlan(txt){
+  const out = [];
+  for (const raw of txt.split("\n")){
+    const m = raw.trim().match(/^(.*?)[\s,;:]+(\d+(?:[.,]\d+)?)\s*(?:min)?$/i);
+    if (m && m[1].trim()) out.push({ name: m[1].trim(), min: parseFloat(m[2].replace(",", ".")) });
+  }
+  return out;
+}
+function setPlan(txt){
+  let list = parsePlan(txt);
+  if (!list.length) list = parsePlan(DEFAULT_PLAN);
+  let s = 0;
+  segs = list.map((p, i) => {
+    const o = { name: p.name, min: p.min, start: s, end: s + p.min * 60, color: COLORS[i % COLORS.length] };
+    s = o.end; return o;
+  });
+  total = s;
+  store.set("plan", list.map(p => p.name + " " + p.min).join("\n"));
+  build(); reset();
+}
+
+// ---------- Geometrie ----------
+const rad = d => d * Math.PI / 180;
+const pt = (deg, r) => [Math.sin(rad(deg)) * r, -Math.cos(rad(deg)) * r]; // 0° = oben, im Uhrzeigersinn
+function arc(a0, a1, r){
+  const [x0,y0] = pt(a0, r), [x1,y1] = pt(a1, r);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+const NS = "http://www.w3.org/2000/svg";
+const el = (n, a = {}) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
+
+function build(){
+  const svg = $("svg"); svg.innerHTML = ""; live = []; labels = [];
+  segs.forEach(s => {
+    const a0 = s.start / total * 360 + GAP / 2, a1 = s.end / total * 360 - GAP / 2;
+    const d = arc(a0, a1, R);
+    svg.appendChild(el("path", { d, class: "seg-base" }));
+    const p = el("path", { d, class: "seg-live", stroke: s.color, pathLength: 1 });
+    svg.appendChild(p); live.push(p);
+    // Beschriftung aussen
+    const mid = (s.start + s.end) / 2 / total * 360;
+    const [lx, ly] = pt(mid, R + 52);
+    const t = el("text", { x: lx, y: ly - 4, class: "lbl" });
+    const n = el("tspan", { x: lx, class: "n" }); n.textContent = s.name;
+    const m = el("tspan", { x: lx, dy: 17 }); m.textContent = fmtMin(s.min);
+    t.append(n, m); svg.appendChild(t); labels.push(t);
+  });
+  dot = el("circle", { r: 11, class: "dot" });
+  svg.appendChild(dot);
+}
+const fmtMin = m => (Number.isInteger(m) ? m : m.toString().replace(".", ",")) + " min";
+
+// ---------- Zeit ----------
+const elapsed = () => acc + (running ? (performance.now() - t0) / 1000 : 0);
+const mmss = s => { s = Math.max(0, Math.ceil(s)); return String(Math.floor(s / 60)).padStart(2,"0") + ":" + String(s % 60).padStart(2,"0"); };
+const hhmm = d => d.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
+
+function update(){
+  const e = elapsed(), over = e >= total;
+  const remain = total - e;
+  const idx = over ? segs.length - 1 : segs.findIndex(s => e >= s.start && e < s.end);
+
+  // Ring
+  segs.forEach((s, i) => {
+    const f = Math.min(1, Math.max(0, (s.end - Math.max(e, s.start)) / (s.end - s.start)));
+    live[i].setAttribute("stroke-dasharray", f <= 0 ? "0 1" : f >= 1 ? "1 0" : `0 ${(1 - f).toFixed(5)} ${f.toFixed(5)} 1`);
+    labels[i].classList.toggle("active", i === idx && !over);
+    labels[i].classList.toggle("done", e >= s.end);
+  });
+  const [dx, dy] = pt(Math.min(e, total) / total * 360, R);
+  dot.setAttribute("cx", dx); dot.setAttribute("cy", dy);
+  dot.style.stroke = over ? "var(--danger)" : segs[Math.max(idx,0)]?.color;
+
+  // Texte
+  const tm = $("time");
+  tm.textContent = over ? "+" + mmss(e - total) : mmss(remain);
+  tm.className = "time" + (over ? " over" : remain <= 60 ? " danger" : remain <= 180 ? " warn" : "");
+  $("phase").textContent = over ? "Zeit ist um" : (running || e > 0 ? segs[idx].name : "Bereit");
+  $("sub").textContent = over || (!running && e === 0) ? "" : "Abschnitt noch " + mmss(segs[idx].end - e);
+  const now = new Date();
+  $("clock").textContent = hhmm(now) + (running && !over ? "  ·  Ende " + hhmm(new Date(now.getTime() + remain * 1000)) : "");
+  document.title = (running || e > 0) ? (over ? "+" + mmss(e - total) : mmss(remain)) + " · Timer" : "Präsentations-Timer";
+
+  // Töne bei Ereignissen
+  if (running){
+    if (idx !== lastPhase && lastPhase !== -1 && !over) beep([660], .25);
+    lastPhase = idx;
+    if (!flags.m3 && remain <= 180 && remain > 179 - 2) { flags.m3 = 1; beep([520, 520], .15); }
+    if (!flags.m1 && remain <= 60 && remain > 58) { flags.m1 = 1; beep([520, 620, 720], .15); }
+    if (!flags.end && over){ flags.end = 1; beep([880, 880, 880], .35); }
+  }
+}
+
+// ---------- Ton ----------
+let ac;
+function beep(freqs, dur){
+  if (muted) return;
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state === "suspended") ac.resume();
+    freqs.forEach((f, i) => {
+      const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + i * (dur + .08);
+      o.frequency.value = f; o.type = "sine";
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.25, t + .02); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+      o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + .05);
+    });
+  } catch {}
+}
+
+// ---------- Steuerung ----------
+function setIcon(){
+  $("goIcon").innerHTML = running ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+}
+async function keepAwake(on){
+  try {
+    if (on && "wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+    else if (wakeLock){ await wakeLock.release(); wakeLock = null; }
+  } catch {}
+}
+function toggle(){
+  if (running){ acc = elapsed(); running = false; keepAwake(false); }
+  else { t0 = performance.now(); running = true; keepAwake(true); if (acc === 0) { flags = {}; lastPhase = -1; } beep([660], .12); }
+  setIcon(); update();
+}
+function reset(){
+  running = false; acc = 0; flags = {}; lastPhase = -1; keepAwake(false); setIcon(); update();
+}
+function jump(dir){
+  const e = elapsed();
+  let idx = segs.findIndex(s => e >= s.start && e < s.end);
+  if (idx < 0) idx = segs.length - 1;
+  let target;
+  if (dir > 0) target = segs[idx + 1] ? segs[idx + 1].start : total;
+  else target = (e - segs[idx].start > 3) ? segs[idx].start : (segs[idx - 1]?.start ?? 0);
+  acc = target; if (running) t0 = performance.now();
+  flags = {}; lastPhase = -1; update();
+}
+function toggleFs(){
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.();
+}
+function openEdit(open){
+  $("edit").classList.toggle("open", open);
+  if (open){ $("ta").value = segs.map(s => s.name + " " + s.min).join("\n"); sumUp(); $("ta").focus(); }
+}
+function sumUp(){
+  const l = parsePlan($("ta").value), s = l.reduce((a, p) => a + p.min, 0);
+  $("sum").textContent = "Total: " + (Number.isInteger(s) ? s : s.toFixed(1)) + " min";
+}
+
+$("bGo").onclick = e => { toggle(); e.currentTarget.blur(); };
+$("bReset").onclick = e => { reset(); e.currentTarget.blur(); };
+$("bEdit").onclick = () => openEdit(true);
+$("bCancel").onclick = () => openEdit(false);
+$("bSave").onclick = () => { setPlan($("ta").value); openEdit(false); };
+$("ta").oninput = sumUp;
+$("edit").onclick = e => { if (e.target === $("edit")) openEdit(false); };
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "TEXTAREA"){
+    if (e.key === "Escape") openEdit(false);
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") $("bSave").click();
+    return;
+  }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (e.code === "Space"){ e.preventDefault(); if (!e.repeat) toggle(); }
+  else if (k === "r") reset();
+  else if (k === "f") toggleFs();
+  else if (k === "e"){ e.preventDefault(); openEdit(true); }
+  else if (k === "m"){ muted = !muted; store.set("muted", muted ? "1" : "0"); if (!muted) beep([660], .12); }
+  else if (k === "t") setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+  else if (e.key === "ArrowRight") jump(1);
+  else if (e.key === "ArrowLeft") jump(-1);
+});
+document.addEventListener("visibilitychange", () => { if (running && !document.hidden) keepAwake(true); });
+
+function setTheme(t){ document.documentElement.dataset.theme = t; store.set("theme", t); }
+setTheme(store.get("theme", "dark"));
+
+setPlan(store.get("plan", DEFAULT_PLAN));
+(function loop(){ update(); requestAnimationFrame(loop); })();
+setInterval(() => { if (document.hidden) update(); }, 500); // läuft auch im Hintergrund-Tab weiter
+</script>
+</body>
+</html>
