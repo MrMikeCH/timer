@@ -321,19 +321,19 @@ setInterval(() => { if (document.hidden) update(); }, 500); // läuft auch im Hi
 <script>
 // Login im Browser (gleicher Hash wie tasks), Merken pro Gerät. Der Hash wird beim Deploy eingesetzt.
 const USER = "mike", HASH = "__HASH__", KEY = "timerLogin";
-const $ = id => document.getElementById(id);
+const el = id => document.getElementById(id);
 const lsGet = () => { try { return localStorage.getItem(KEY); } catch (e) { return null; } };
 const lsSet = v => { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch (e) {} };
 function enter() {
-  $("login").hidden = true; $("app").hidden = false;
-  const s = document.createElement("script"); s.textContent = $("appjs").textContent; document.body.appendChild(s);
+  el("login").hidden = true; el("app").hidden = false;
+  const s = document.createElement("script"); s.textContent = el("appjs").textContent; document.body.appendChild(s);
 }
-if (lsGet() === HASH) enter(); else $("login").hidden = false;
-$("loginForm").addEventListener("submit", e => {
-  e.preventDefault(); $("err").textContent = "";
-  const bad = () => { $("err").textContent = "Benutzer oder Passwort falsch."; };
-  if ($("u").value.trim().toLowerCase() !== USER) return bad();
-  dcodeIO.bcrypt.compare($("p").value, HASH, (err, ok) => { if (!ok) return bad(); if ($("rem").checked) lsSet(HASH); enter(); });
+if (lsGet() === HASH) enter(); else el("login").hidden = false;
+el("loginForm").addEventListener("submit", e => {
+  e.preventDefault(); el("err").textContent = "";
+  const bad = () => { el("err").textContent = "Benutzer oder Passwort falsch."; };
+  if (el("u").value.trim().toLowerCase() !== USER) return bad();
+  dcodeIO.bcrypt.compare(el("p").value, HASH, (err, ok) => { if (!ok) return bad(); if (el("rem").checked) lsSet(HASH); enter(); });
 });
 </script>
 </body>
