@@ -12,7 +12,7 @@ command -v lftp >/dev/null || { echo "lftp fehlt: brew install lftp"; exit 1; }
 [ -f "$HOME/.netrc" ] || { echo "~/.netrc fehlt"; exit 1; }
 
 # Hash aus dem Aufgaben-Login (lokal, nicht im Repo) in eine Kopie einsetzen
-HASHFILE="$LOCAL/../../../Claude/tasks/.htpasswd"
+HASHFILE="$LOCAL/../../../tasks/.htpasswd"
 [ -f "$HASHFILE" ] || { echo ".htpasswd fehlt: $HASHFILE"; exit 1; }
 BUILD="$(mktemp -d)"; trap 'rm -rf "$BUILD"' EXIT
 HASH="$(cut -d: -f2 "$HASHFILE" | head -1)"
